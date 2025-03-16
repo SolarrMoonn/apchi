@@ -1,0 +1,128 @@
+-- 1. Создание таблицы "Рубрикатор"
+CREATE TABLE Rubricator (
+    Shifr VARCHAR(8) PRIMARY KEY,
+    Name VARCHAR(80) NOT NULL
+);
+
+-- 2. Создание таблицы "Книги"
+CREATE TABLE Books (
+    Rubricator VARCHAR(8),
+    Shifr VARCHAR(10) PRIMARY KEY,
+    Name VARCHAR(80) NOT NULL,
+    Authors VARCHAR(50),
+    Publisher VARCHAR(25) NOT NULL,
+    Year INTEGER NOT NULL,
+    Pages INTEGER CHECK (Pages > 0),
+    Note VARCHAR(40) DEFAULT 'учебник',
+    FOREIGN KEY (Rubricator) REFERENCES Rubricator(Shifr)
+);
+
+-- 3. Создание таблицы "Читатели"
+CREATE TABLE Readers (
+    ID SERIAL PRIMARY KEY,  -- SERIAL для автоматического увеличения ID
+    LastName VARCHAR(50) NOT NULL,
+    FirstNameMiddle VARCHAR(50) NOT NULL,
+    Address VARCHAR(100),
+    PassportData VARCHAR(50),
+    Email VARCHAR(50) UNIQUE
+);
+
+-- 4. Создание таблицы "Абонемент" с каскадным удалением
+CREATE TABLE Subscription (
+    ReaderID INTEGER,
+    BookID VARCHAR(10),
+    IssueDate DATE NOT NULL,
+    ReturnDate DATE,
+    PRIMARY KEY (ReaderID, BookID, IssueDate),
+    FOREIGN KEY (ReaderID) REFERENCES Readers(ID) ON DELETE CASCADE,
+    FOREIGN KEY (BookID) REFERENCES Books(Shifr) ON DELETE CASCADE
+);
+
+-- 5. Заполнение таблицы "Рубрикатор"
+INSERT INTO Rubricator (Shifr, Name) VALUES
+('MATH', 'Математика'),
+('PHYS', 'Физика'),
+('CSCI', 'Информатика');
+
+-- 6. Заполнение таблицы "Книги"
+INSERT INTO Books (Rubricator, Shifr, Name, Authors, Publisher, Year, Pages, Note) VALUES
+('MATH', 'B001', 'Высшая математика', 'Иванов П.', 'Наука', 2020, 500, 'учебник'),
+('PHYS', 'B002', 'Основы физики', 'Петров С.', 'ФизПресс', 2019, 400, 'справочник'),
+('CSCI', 'B003', 'Программирование на Python', 'Сидоров А.', 'Код', 2021, 300, 'учебник');
+
+-- 7. Заполнение таблицы "Читатели"
+INSERT INTO Readers (LastName, FirstNameMiddle, Address, PassportData, Email) VALUES
+('Смирнов', 'Алексей Иванович', 'Москва, ул. Ленина, д. 5', '4500 123456', 'alex@example.com'),
+('Иванова', 'Мария Сергеевна', 'СПб, ул. Невская, д. 10', '4600 654321', 'maria@example.com');
+
+-- 8. Заполнение таблицы "Абонемент"
+INSERT INTO Subscription (ReaderID, BookID, IssueDate, ReturnDate) VALUES
+(1, 'B001', '2024-01-10', NULL),  -- Книга на руках
+(2, 'B002', '2024-01-12', '2024-01-22'),  -- Книга возвращена
+(1, 'B003', '2024-02-01', NULL);  -- Книга на руках
+
+-- 1. Представление "Книги, не пользующиеся спросом"
+CREATE VIEW UnpopularBooks AS
+SELECT *
+FROM Books b
+WHERE b.Year < EXTRACT(YEAR FROM CURRENT_DATE) - 1
+  AND NOT EXISTS (
+      SELECT 1
+      FROM Subscription s
+      WHERE s.BookID = b.Shifr
+  );
+
+-- 2. Представление "Активность читателей"
+CREATE VIEW ReaderActivity AS
+SELECT 
+    r.ID AS ReaderID,
+    r.LastName,
+    r.FirstNameMiddle,
+    (SELECT COUNT(*) 
+     FROM Subscription s 
+     WHERE s.ReaderID = r.ID 
+       AND s.ReturnDate IS NOT NULL) AS BooksRead,
+    (SELECT COUNT(*) 
+     FROM Subscription s 
+     WHERE s.ReaderID = r.ID 
+       AND s.ReturnDate IS NULL) AS BooksBorrowed
+FROM 
+    Readers r;
+
+-- 3. Представление "Повторы"
+CREATE VIEW RepeatedBooks AS
+SELECT 
+    r.LastName,
+    r.FirstNameMiddle,
+    b.Shifr AS BookID,
+    b.Name AS BookName,
+    MAX(s.IssueDate) AS LastIssueDate
+FROM 
+    Readers r
+JOIN 
+    Subscription s ON r.ID = s.ReaderID
+JOIN 
+    Books b ON s.BookID = b.Shifr
+GROUP BY 
+    r.ID, r.LastName, r.FirstNameMiddle, b.Shifr, b.Name
+HAVING 
+    COUNT(*) > 1;
+
+-- 4. Обновляемое представление "Список книг"
+CREATE VIEW SimpleBooks AS
+SELECT Shifr, Name, Authors, Publisher, Year
+FROM Books;
+
+-- Проверка обновляемости представления "SimpleBooks"
+-- INSERT
+INSERT INTO SimpleBooks (Shifr, Name, Authors, Publisher, Year)
+VALUES ('B004', 'Новая книга', 'Автор', 'Издательство', 2023);
+
+-- UPDATE
+UPDATE SimpleBooks
+SET Name = 'Обновленная книга'
+WHERE Shifr = 'B001';
+
+-- DELETE
+DELETE FROM SimpleBooks
+WHERE Shifr = 'B001';
