@@ -63,7 +63,7 @@ INSERT INTO Subscription (ReaderID, BookID, IssueDate, ReturnDate) VALUES
 
 -- 1. Представление "Книги, не пользующиеся спросом"
 CREATE VIEW UnpopularBooks AS
-SELECT *
+SELECT Shifr, Name, Authors, Publisher, Year, Pages, Note
 FROM Books b
 WHERE b.Year < EXTRACT(YEAR FROM CURRENT_DATE) - 1
   AND NOT EXISTS (
@@ -71,7 +71,6 @@ WHERE b.Year < EXTRACT(YEAR FROM CURRENT_DATE) - 1
       FROM Subscription s
       WHERE s.BookID = b.Shifr
   );
-
 -- 2. Представление "Активность читателей"
 CREATE VIEW ReaderActivity AS
 SELECT 
@@ -96,33 +95,30 @@ SELECT
     r.FirstNameMiddle,
     b.Shifr AS BookID,
     b.Name AS BookName,
-    MAX(s.IssueDate) AS LastIssueDate
+    s1.IssueDate AS LastIssueDate
 FROM 
     Readers r
 JOIN 
-    Subscription s ON r.ID = s.ReaderID
+    Subscription s1 ON r.ID = s1.ReaderID
 JOIN 
-    Books b ON s.BookID = b.Shifr
-GROUP BY 
-    r.ID, r.LastName, r.FirstNameMiddle, b.Shifr, b.Name
-HAVING 
-    COUNT(*) > 1;
+    Books b ON s1.BookID = b.Shifr
+JOIN 
+    Subscription s2 ON s1.ReaderID = s2.ReaderID 
+                    AND s1.BookID = s2.BookID 
+                    AND s1.IssueDate < s2.IssueDate;
 
--- 4. Обновляемое представление "Список книг"
-CREATE VIEW SimpleBooks AS
-SELECT Shifr, Name, Authors, Publisher, Year
-FROM Books;
-
--- Проверка обновляемости представления "SimpleBooks"
 -- INSERT
-INSERT INTO SimpleBooks (Shifr, Name, Authors, Publisher, Year)
-VALUES ('B004', 'Новая книга', 'Автор', 'Издательство', 2023);
+-- Вставка новой книги, которая соответствует условиям представления
+INSERT INTO UnpopularBooks (Shifr, Name, Authors, Publisher, Year, Pages, Note)
+VALUES ('B004', 'Новая книга', 'Автор', 'Издательство', 2022, 200, 'учебник');
 
--- UPDATE
-UPDATE SimpleBooks
+
+-- Обновление названия книги
+UPDATE UnpopularBooks
 SET Name = 'Обновленная книга'
-WHERE Shifr = 'B001';
+WHERE Shifr = 'B004';
 
--- DELETE
-DELETE FROM SimpleBooks
-WHERE Shifr = 'B001';
+
+-- Удаление книги
+DELETE FROM UnpopularBooks
+WHERE Shifr = 'B004';
