@@ -1,0 +1,109 @@
+-- 1. Создание таблицы "Рубрикатор"
+CREATE TABLE Rubricator (
+    Shifr VARCHAR(8) PRIMARY KEY,
+    Name VARCHAR(80) NOT NULL
+);
+
+-- 2. Создание таблицы "Книги"
+CREATE TABLE Books (
+    Rubricator VARCHAR(8),
+    Shifr VARCHAR(10) PRIMARY KEY,
+    Name VARCHAR(80) NOT NULL,
+    Authors VARCHAR(50),
+    Publisher VARCHAR(25) NOT NULL,
+    Year INTEGER NOT NULL,
+    Pages INTEGER CHECK (Pages > 0),
+    Note VARCHAR(40) DEFAULT 'учебник',
+    FOREIGN KEY (Rubricator) REFERENCES Rubricator(Shifr)
+);
+
+-- 3. Создание таблицы "Читатели"
+CREATE TABLE Readers (
+    ID SERIAL PRIMARY KEY,  -- SERIAL для автоматического увеличения ID
+    LastName VARCHAR(50) NOT NULL,
+    FirstNameMiddle VARCHAR(50) NOT NULL,
+    Address VARCHAR(100),
+    PassportData VARCHAR(50),
+    Email VARCHAR(50) UNIQUE
+);
+
+-- 4. Создание таблицы "Абонемент" с каскадным удалением
+CREATE TABLE Subscription (
+    ReaderID INTEGER,
+    BookID VARCHAR(10),
+    IssueDate DATE NOT NULL,
+    ReturnDate DATE,
+    PRIMARY KEY (ReaderID, BookID, IssueDate),
+    FOREIGN KEY (ReaderID) REFERENCES Readers(ID) ON DELETE CASCADE,
+    FOREIGN KEY (BookID) REFERENCES Books(Shifr) ON DELETE CASCADE
+);
+
+-- 5. Заполнение таблицы "Рубрикатор"
+INSERT INTO Rubricator (Shifr, Name) VALUES
+('MATH', 'Математика'),
+('PHYS', 'Физика'),
+('CSCI', 'Информатика');
+
+-- 6. Заполнение таблицы "Книги"
+INSERT INTO Books (Rubricator, Shifr, Name, Authors, Publisher, Year, Pages, Note) VALUES
+('MATH', 'B001', 'Высшая математика', 'Иванов П.', 'Наука', 2020, 500, 'учебник'),
+('PHYS', 'B002', 'Основы физики', 'Петров С.', 'ФизПресс', 2019, 400, 'справочник'),
+('CSCI', 'B003', 'Программирование на Python', 'Сидоров А.', 'Код', 2021, 300, 'учебник');
+
+-- 7. Заполнение таблицы "Читатели"
+INSERT INTO Readers (LastName, FirstNameMiddle, Address, PassportData, Email) VALUES
+('Смирнов', 'Алексей Иванович', 'Москва, ул. Ленина, д. 5', '4500 123456', 'alex@example.com'),
+('Иванова', 'Мария Сергеевна', 'СПб, ул. Невская, д. 10', '4600 654321', 'maria@example.com');
+
+-- 8. Заполнение таблицы "Абонемент"
+INSERT INTO Subscription (ReaderID, BookID, IssueDate, ReturnDate) VALUES
+(1, 'B001', '2024-01-10', NULL),  -- Книга на руках
+(2, 'B002', '2024-01-12', '2024-01-22'),  -- Книга возвращена
+(1, 'B003', '2024-02-01', NULL);  -- Книга на руках
+
+-- 1. Проекция: Выбор названий и авторов всех книг
+SELECT Name, Authors
+FROM Books;
+
+-- 2. Селекция: Выбор книг, выпущенных после 2020 года
+SELECT *
+FROM Books
+WHERE Year > 2020;
+
+-- 3. Объединение: Создание и объединение таблиц Readers и Readers2
+CREATE TABLE Readers2 (
+    ID SERIAL PRIMARY KEY,
+    LastName VARCHAR(50) NOT NULL,
+    FirstNameMiddle VARCHAR(50) NOT NULL,
+    Address VARCHAR(100),
+    PassportData VARCHAR(50),
+    Email VARCHAR(50) UNIQUE
+);
+
+INSERT INTO Readers2 (LastName, FirstNameMiddle, Address, PassportData, Email) VALUES
+('Петров', 'Иван Сергеевич', 'Москва, ул. Пушкина, д. 10', '4700 123456', 'ivan@example.com'),
+('Сидорова', 'Ольга Ивановна', 'СПб, ул. Гоголя, д. 5', '4800 654321', 'olga@example.com');
+
+SELECT * FROM Readers
+UNION
+SELECT * FROM Readers2;
+
+-- 4. Разность: Читатели, которые есть в Readers, но отсутствуют в Readers2
+SELECT *
+FROM Readers
+WHERE ID NOT IN (SELECT ID FROM Readers2);
+
+-- 5. Пересечение: Читатели, которые есть в обеих таблицах
+SELECT *
+FROM Readers
+WHERE ID IN (SELECT ID FROM Readers2);
+
+-- 6. Декартово произведение: Все комбинации читателей и книг
+SELECT *
+FROM Readers, Books;
+
+-- 7. Соединение: Читатели и книги, которые они взяли
+SELECT r.LastName, r.FirstNameMiddle, b.Name AS BookName, s.IssueDate
+FROM Readers r
+JOIN Subscription s ON r.ID = s.ReaderID
+JOIN Books b ON s.BookID = b.Shifr;
